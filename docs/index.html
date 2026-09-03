@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>概述 · Llama-2-Transformers</title>
+  <meta name="description" content="本仓库的静态说明页。介绍 README 与 hg8gpu.py 里实际写了什么。这不是浏览器里的在线推理演示。">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <div class="mast">
+      <a class="brand" href="index.html">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" fill="#1a1714"/>
+          <rect x="4" y="4" width="24" height="24" fill="#f6f0e4"/>
+          <rect x="7" y="8" width="18" height="2" fill="#8c2f14"/>
+          <rect x="7" y="13" width="12" height="2" fill="#1a1714"/>
+          <rect x="7" y="18" width="15" height="2" fill="#1a1714"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name">Llama-2-Transformers</span>
+          <span class="brand-kicker">公开仓库静态说明</span>
+        </span>
+      </a>
+      <a class="repo-link" href="https://github.com/UnstoppableCurry/Llama-2-Transformers">GitHub 源码</a>
+    </div>
+    <nav class="site-nav" aria-label="站点">
+      <a href="index.html" aria-current="page">概述</a>
+      <a href="architecture.html">架构</a>
+      <a href="usage.html">用法</a>
+      <a href="limitations.html">局限</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <p class="eyebrow">仓库说明 · 不是演示产品</p>
+    <h1>用 transformers 做 Llama-2 分布式推理的公开脚本</h1>
+    <p class="lede">README 原句：llama2 使用 Hugging Face 的 transformers API 进行分布式推理。仓库里目前只有两份文件：<code>README.md</code> 和 <code>hg8gpu.py</code>。</p>
+    <p class="en-note">This is a static documentation site, not a live browser inference demo.</p>
+
+    <aside class="callout" aria-label="重要说明">
+      <strong>这不是浏览器里的在线推理演示。</strong>
+      本站不会加载模型、不会调用 GPU、也不会返回生成结果。要按 README 跑起来，需要本机 GPU、Hugging Face 上的权重，以及 GPU 版 PyTorch，然后在本地执行 <code>python hg8gpu.py</code>。
+    </aside>
+
+    <h2>仓库里有什么</h2>
+    <ul class="file-list">
+      <li><code>README.md</code>：获取权重、安装依赖、运行脚本三步。</li>
+      <li><code>hg8gpu.py</code>：约 50 行的交互式推理脚本。文件名暗示 8 张 GPU，但实现很薄，详见<a href="architecture.html">架构</a>。</li>
+    </ul>
+    <p>仓库不包含模型权重、密钥或运行日志。本站也不收录这些内容。</p>
+
+    <h2>能从源码直接确认的事</h2>
+    <ul class="plain-list">
+      <li>脚本走 Hugging Face <code>transformers</code>：<code>AutoTokenizer</code> 与 <code>AutoModelForCausalLM</code>。</li>
+      <li>多 GPU 相关代码是 <code>torch.distributed</code> + <code>DistributedDataParallel</code>，不是 Hugging Face 的 <code>device_map</code>。</li>
+      <li>整模先 <code>.to(device_ids[0])</code>，也就是先放到 GPU 0。</li>
+      <li>随后进入 <code>input()</code> 对话循环，<code>model.generate(..., max_length=200)</code>，输入 <code>exit</code> 结束。</li>
+    </ul>
+    <p>以上都是对源码的转述。仓库没有给出吞吐、显存、延迟或生产部署数据，本站也不编造。</p>
+
+    <h2>继续阅读</h2>
+    <div class="cards">
+      <a class="card" href="architecture.html">
+        <h2>架构</h2>
+        <p>对照 <code>hg8gpu.py</code> 看它实际怎么摆设备和进程组。</p>
+      </a>
+      <a class="card" href="usage.html">
+        <h2>用法</h2>
+        <p>按 README 的三步：克隆权重、安装依赖、运行脚本。</p>
+      </a>
+      <a class="card" href="limitations.html">
+        <h2>局限</h2>
+        <p>脚本没写的部分，以及本站明确不声称的事项。</p>
+      </a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>内容只依据本仓库的 <code>README.md</code> 与 <code>hg8gpu.py</code>。未收录权重或密钥。</p>
+    <p>站点路径：<a href="https://unstoppablecurry.github.io/Llama-2-Transformers/">/Llama-2-Transformers/</a></p>
+  </footer>
+</body>
+</html>

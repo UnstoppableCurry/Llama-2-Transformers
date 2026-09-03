@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>用法 · Llama-2-Transformers</title>
+  <meta name="description" content="按 README 的三步在本地运行 hg8gpu.py。需要本机 GPU、权重和 GPU 版 PyTorch。">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <div class="mast">
+      <a class="brand" href="index.html">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" fill="#1a1714"/>
+          <rect x="4" y="4" width="24" height="24" fill="#f6f0e4"/>
+          <rect x="7" y="8" width="18" height="2" fill="#8c2f14"/>
+          <rect x="7" y="13" width="12" height="2" fill="#1a1714"/>
+          <rect x="7" y="18" width="15" height="2" fill="#1a1714"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name">Llama-2-Transformers</span>
+          <span class="brand-kicker">公开仓库静态说明</span>
+        </span>
+      </a>
+      <a class="repo-link" href="https://github.com/UnstoppableCurry/Llama-2-Transformers">GitHub 源码</a>
+    </div>
+    <nav class="site-nav" aria-label="站点">
+      <a href="index.html">概述</a>
+      <a href="architecture.html">架构</a>
+      <a href="usage.html" aria-current="page">用法</a>
+      <a href="limitations.html">局限</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <p class="eyebrow">来源：README.md</p>
+    <h1>按 README 在本地运行</h1>
+    <p class="lede">下面三步来自仓库 README，没有改步骤、也没有补仓库里没有写的安装细节。</p>
+
+    <aside class="callout" aria-label="重要说明">
+      <strong>不能在这个网页里运行模型。</strong>
+      需要本机（或你自己的机器）上的 GPU、已安装的 GPU 版 <code>torch</code>、以及按第一步取到的权重。本站只是说明。
+    </aside>
+
+    <ol class="steps">
+      <li>
+        <h2>获取权重</h2>
+        <p>README 写的是用 git-lfs 克隆 NousResearch 的 Llama-2-70b-chat-hf：</p>
+        <pre><code>git lfs install
+git clone https://huggingface.co/NousResearch/Llama-2-70b-chat-hf</code></pre>
+      </li>
+      <li>
+        <h2>安装依赖</h2>
+        <p>README 列出两行 pip，并注明 torch 要用 GPU 版本：</p>
+        <pre><code>pip install transformers
+pip install torch # gpu 版本</code></pre>
+      </li>
+      <li>
+        <h2>进行推理</h2>
+        <p>README 的运行命令是：</p>
+        <pre><code>python hg8gpu.py</code></pre>
+        <p>脚本会进入 <code>You:</code> 提示的循环。输入 <code>exit</code>（大小写不敏感）后打印 <code>Goodbye!</code> 并销毁进程组。</p>
+      </li>
+    </ol>
+
+    <h2>和脚本加载路径的差异</h2>
+    <p>README 克隆的仓库 ID 是 <code>NousResearch/Llama-2-70b-chat-hf</code>。脚本里 <code>from_pretrained</code> 写的是 <code>meta-llama/Llama-2-70b-chat-hf</code>。仓库没有说明如何把本地克隆目录传给脚本。运行前需要自己核对权重从哪里加载。</p>
+
+    <h2>运行时脚本会向你要什么</h2>
+    <ul class="plain-list">
+      <li>标准输入：每一轮用户句子。</li>
+      <li>本地 GPU 与 NCCL：脚本会 <code>init_process_group</code>，地址为 <code>tcp://localhost:23456</code>。</li>
+      <li>能被 <code>transformers</code> 解析的 <code>meta-llama/Llama-2-70b-chat-hf</code>（或你改过之后的路径）。</li>
+    </ul>
+    <p>README 没有写 CUDA 版本、显卡型号或显存要求。本页也不补充未经仓库记载的数字。</p>
+  </main>
+
+  <footer class="site-footer">
+    <p>内容只依据本仓库的 <code>README.md</code> 与 <code>hg8gpu.py</code>。未收录权重或密钥。</p>
+    <p><a href="index.html">返回概述</a> · <a href="architecture.html">架构</a> · <a href="limitations.html">局限</a></p>
+  </footer>
+</body>
+</html>
