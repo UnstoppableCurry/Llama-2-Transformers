@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>架构 · Llama-2-Transformers</title>
+  <meta name="description" content="对照 hg8gpu.py 说明实际的设备与进程组写法。脚本很薄，没有使用 Hugging Face device_map。">
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="site-header">
+    <div class="mast">
+      <a class="brand" href="index.html">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <rect width="32" height="32" fill="#1a1714"/>
+          <rect x="4" y="4" width="24" height="24" fill="#f6f0e4"/>
+          <rect x="7" y="8" width="18" height="2" fill="#8c2f14"/>
+          <rect x="7" y="13" width="12" height="2" fill="#1a1714"/>
+          <rect x="7" y="18" width="15" height="2" fill="#1a1714"/>
+        </svg>
+        <span class="brand-text">
+          <span class="brand-name">Llama-2-Transformers</span>
+          <span class="brand-kicker">公开仓库静态说明</span>
+        </span>
+      </a>
+      <a class="repo-link" href="https://github.com/UnstoppableCurry/Llama-2-Transformers">GitHub 源码</a>
+    </div>
+    <nav class="site-nav" aria-label="站点">
+      <a href="index.html">概述</a>
+      <a href="architecture.html" aria-current="page">架构</a>
+      <a href="usage.html">用法</a>
+      <a href="limitations.html">局限</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <p class="eyebrow">来源：hg8gpu.py</p>
+    <h1>脚本实际怎么用多 GPU</h1>
+    <p class="lede"><code>hg8gpu.py</code> 大约 50 行，是一份薄脚本：导入、初始化进程组、加载模型、包一层 DDP、然后进入对话循环。它没有单独的服务进程、配置文件或分层模块。</p>
+
+    <aside class="callout" aria-label="重要说明">
+      <strong>不要把它读成已验证的 8 卡生产服务。</strong>
+      文件名和 <code>num_gpus = 8</code> 只说明脚本按 8 张卡来写。仓库没有吞吐、显存或在线服务实现，本页只转述源码调用。
+    </aside>
+
+    <h2>先说结论</h2>
+    <p>脚本<strong>没有</strong>使用 Hugging Face / Accelerate 常见的 <code>device_map</code>（例如 <code>device_map="auto"</code>）把层分到多张卡。它做的是：</p>
+    <ol class="plain-list">
+      <li>把整模 <code>.to(device_ids[0])</code>，先放到 GPU 0；</li>
+      <li>再包 <code>torch.nn.parallel.DistributedDataParallel</code>；</li>
+      <li>进程组用 NCCL，<code>world_size=8</code>，但 <code>rank</code> 写死为 <code>0</code>。</li>
+    </ol>
+    <p>注释写「将模型拆分到多个GPU上」，但所用 API 是 DDP。DDP 的常规语义是数据并行（各进程一份模型副本），不是按层切分的模型并行。</p>
+
+    <h2>按执行顺序</h2>
+    <div class="flow">
+      <div class="flow-item">
+        <strong>设备数量</strong>
+        <code>num_gpus = 8</code>，<code>torch.cuda.set_device(0)</code>。当前进程绑到 cuda:0。
+      </div>
+      <div class="flow-item">
+        <strong>进程组</strong>
+        <code>dist.init_process_group(backend='nccl', init_method='tcp://localhost:23456', world_size=num_gpus, rank=0)</code>，然后 <code>dist.barrier()</code>。
+      </div>
+      <div class="flow-item">
+        <strong>加载</strong>
+        <code>from_pretrained("meta-llama/Llama-2-70b-chat-hf")</code>，整模 <code>.to(device_ids[0])</code>。
+      </div>
+      <div class="flow-item">
+        <strong>并行包装</strong>
+        <code>DistributedDataParallel(model, device_ids=list(range(8)))</code>，再 <code>model.half()</code>。
+      </div>
+      <div class="flow-item">
+        <strong>推理循环</strong>
+        <code>input("You: ")</code> → <code>tokenizer.encode</code> → 放到 GPU 0 → <code>inputs.half()</code> → 可选拼接 <code>context</code> → <code>model.generate(..., max_length=200)</code>。
+      </div>
+      <div class="flow-item">
+        <strong>退出</strong>
+        输入 <code>exit</code> 后打印 Goodbye，再 <code>dist.destroy_process_group()</code>。
+      </div>
+    </div>
+
+    <h2>和常见多 GPU 推理写法的对照</h2>
+    <table>
+      <caption class="visually-hidden">源码做法对照</caption>
+      <thead>
+        <tr>
+          <th>做法</th>
+          <th>本仓库 hg8gpu.py</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Hugging Face <code>device_map</code> / Accelerate 分层放置</td>
+          <td>未出现</td>
+        </tr>
+        <tr>
+          <td>流水线并行或张量并行框架</td>
+          <td>未出现</td>
+        </tr>
+        <tr>
+          <td><code>torch.nn.parallel.DistributedDataParallel</code></td>
+          <td>有，<code>device_ids</code> 为 0–7</td>
+        </tr>
+        <tr>
+          <td>整模先放到单卡</td>
+          <td>有，<code>.to(device_ids[0])</code></td>
+        </tr>
+        <tr>
+          <td>用 <code>torchrun</code> 或 spawn 拉起多个 rank</td>
+          <td>未见；<code>rank=0</code> 写死，单文件直接 <code>python hg8gpu.py</code></td>
+        </tr>
+        <tr>
+          <td>HTTP 服务、批处理、健康检查</td>
+          <td>未见</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>源码摘录</h2>
+    <p>设备与并行相关的语句如下（与仓库文件一致）：</p>
+    <pre><code>num_gpus = 8
+torch.cuda.set_device(0)
+
+dist.init_process_group(
+    backend='nccl',
+    init_method='tcp://localhost:23456',
+    world_size=num_gpus,
+    rank=0,
+)
+device_ids = list(range(num_gpus))
+dist.barrier()
+
+tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-70b-chat-hf")
+model = AutoModelForCausalLM.from_pretrained(
+    "meta-llama/Llama-2-70b-chat-hf"
+).to(device_ids[0])
+
+model = torch.nn.parallel.DistributedDataParallel(model, device_ids=device_ids)
+model = model.half()</code></pre>
+
+    <div class="note">
+      <p>README 用 <code>git clone</code> 拉取的是 <code>NousResearch/Llama-2-70b-chat-hf</code>；脚本 <code>from_pretrained</code> 写的是 <code>meta-llama/Llama-2-70b-chat-hf</code>。仓库没有把本地克隆目录接到加载路径上。这是文件之间的差异，不是额外结论。</p>
+    </div>
+
+    <h2>对话循环里还做了什么</h2>
+    <ul class="plain-list">
+      <li>用户输入经 <code>tokenizer.encode(..., return_tensors="pt")</code> 后放到 GPU 0，再 <code>.half()</code>。</li>
+      <li>若已有 <code>context</code>，在最后一维与当前输入拼接。</li>
+      <li><code>torch.no_grad()</code> 下调用 <code>generate</code>，<code>pad_token_id=tokenizer.eos_token_id</code>。</li>
+      <li>解码 <code>outputs[0, inputs.shape[-1]:]</code>，打印 <code>Model:</code> 前缀。</li>
+      <li>把 <code>outputs[:, inputs.shape[-1]:]</code> 存进 <code>context</code>，供下一轮使用。</li>
+    </ul>
+    <p>页面到此为止。脚本没有更多并行策略、调度器或测量代码。</p>
+  </main>
+
+  <footer class="site-footer">
+    <p>内容只依据本仓库的 <code>README.md</code> 与 <code>hg8gpu.py</code>。未收录权重或密钥。</p>
+    <p><a href="index.html">返回概述</a> · <a href="usage.html">用法</a> · <a href="limitations.html">局限</a></p>
+  </footer>
+</body>
+</html>
