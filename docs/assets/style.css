@@ -335,6 +335,8 @@ pre {
   border: 1px solid #14110e;
   font-size: 0.82rem;
   line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 pre code {
